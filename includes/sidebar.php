@@ -1,0 +1,2 @@
+<?php
+// Sidebar content placeholder
