@@ -4,7 +4,7 @@ date_default_timezone_set('Asia/Bangkok');
 
 // Google Sheets Configuration
 define('GOOGLE_SHEETS_ID', '1rRgSpwzFQz9m_DCor7vu1Q8KOkr6z28PGlycM0iQ8jM');
-define('GOOGLE_API_KEY', '8141fd13fda7b186e865dab11795fe969be17966');
+define('GOOGLE_API_KEY', 'AIzaSyDgLz5TflZJ5pV4LT133M5HkoZCemQF2oc');
 define('GOOGLE_SERVICE_ACCOUNT_FILE', '../config/service-account.json');
 
 // Session timeout (30 minutes)
