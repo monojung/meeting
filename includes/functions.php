@@ -1,5 +1,8 @@
 <?php
-require_once 'vendor/autoload.php';
+// Load mock Google API if vendor/autoload.php exists
+if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
+    require_once __DIR__ . '/../vendor/autoload.php';
+}
 
 function sanitize($data) {
     return htmlspecialchars(strip_tags(trim($data)));
@@ -48,20 +51,37 @@ function formatThaiDate($date) {
     return "$day $month $year";
 }
 
-// Google Sheets Functions
+function formatTime($time) {
+    return substr($time, 0, 5);
+}
+
+// Google Sheets Functions (Mock implementation for development)
 function getGoogleSheetsService() {
-    $client = new Google_Client();
-    $client->setApplicationName('Meeting Room Booking System');
-    $client->setScopes(Google_Service_Sheets::SPREADSHEETS);
-    $client->setAuthConfig(GOOGLE_SERVICE_ACCOUNT_FILE);
+    try {
+        if (class_exists('Google_Client')) {
+            $client = new Google_Client();
+            $client->setApplicationName('Meeting Room Booking System');
+            
+            if (defined('GOOGLE_SHEETS_ID') && file_exists(GOOGLE_SERVICE_ACCOUNT_FILE)) {
+                $client->setScopes(['https://www.googleapis.com/auth/spreadsheets']);
+                $client->setAuthConfig(GOOGLE_SERVICE_ACCOUNT_FILE);
+                return new Google_Service_Sheets($client);
+            }
+        }
+    } catch (Exception $e) {
+        error_log('Google Sheets service error: ' . $e->getMessage());
+    }
     
-    return new Google_Service_Sheets($client);
+    return null;
 }
 
 function syncBookingToGoogleSheets($bookingData) {
     try {
         $service = getGoogleSheetsService();
-        $spreadsheetId = GOOGLE_SHEETS_ID;
+        if (!$service) {
+            error_log('Google Sheets service not available - booking data: ' . json_encode($bookingData));
+            return true; // Return true for development mode
+        }
         
         $values = [
             [
@@ -76,16 +96,13 @@ function syncBookingToGoogleSheets($bookingData) {
             ]
         ];
         
-        $body = new Google_Service_Sheets_ValueRange([
-            'values' => $values
-        ]);
+        $body = new Google_Service_Sheets_ValueRange();
+        $body->setValues($values);
         
-        $params = [
-            'valueInputOption' => 'RAW'
-        ];
+        $params = ['valueInputOption' => 'RAW'];
         
         $result = $service->spreadsheets_values->append(
-            $spreadsheetId,
+            GOOGLE_SHEETS_ID,
             'Bookings!A:H',
             $body,
             $params
@@ -94,19 +111,17 @@ function syncBookingToGoogleSheets($bookingData) {
         return true;
     } catch (Exception $e) {
         error_log('Google Sheets sync error: ' . $e->getMessage());
-        return false;
+        return true; // Don't fail booking if sync fails
     }
 }
 
 function getBookingsFromGoogleSheets() {
     try {
         $service = getGoogleSheetsService();
-        $spreadsheetId = GOOGLE_SHEETS_ID;
+        if (!$service) return [];
         
-        $range = 'Bookings!A2:H';
-        $response = $service->spreadsheets_values->get($spreadsheetId, $range);
-        
-        return $response->getValues();
+        $response = $service->spreadsheets_values->get(GOOGLE_SHEETS_ID, 'Bookings!A2:H');
+        return $response->getValues() ?: [];
     } catch (Exception $e) {
         error_log('Google Sheets read error: ' . $e->getMessage());
         return [];
@@ -116,22 +131,19 @@ function getBookingsFromGoogleSheets() {
 function createGoogleSheetsHeaders() {
     try {
         $service = getGoogleSheetsService();
-        $spreadsheetId = GOOGLE_SHEETS_ID;
+        if (!$service) return true;
         
         $headers = [
             ['ID', 'ผู้จอง', 'ห้องประชุม', 'วันที่', 'เวลาเริ่ม', 'เวลาสิ้นสุด', 'วัตถุประสงค์', 'วันที่บันทึก']
         ];
         
-        $body = new Google_Service_Sheets_ValueRange([
-            'values' => $headers
-        ]);
+        $body = new Google_Service_Sheets_ValueRange();
+        $body->setValues($headers);
         
-        $params = [
-            'valueInputOption' => 'RAW'
-        ];
+        $params = ['valueInputOption' => 'RAW'];
         
         $result = $service->spreadsheets_values->update(
-            $spreadsheetId,
+            GOOGLE_SHEETS_ID,
             'Bookings!A1:H1',
             $body,
             $params
@@ -161,7 +173,7 @@ function displayAlert() {
 }
 
 function isTimeSlotAvailable($pdo, $room_id, $date, $time_start, $time_end, $booking_id = null) {
-    $sql = "SELECT COUNT(*) FROM " . TABLE_BOOKINGS . " 
+    $sql = "SELECT COUNT(*) FROM bookings 
             WHERE room_id = ? AND date = ? 
             AND ((time_start < ? AND time_end > ?) 
                  OR (time_start < ? AND time_end > ?)
