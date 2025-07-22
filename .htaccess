@@ -1,3 +1,93 @@
+# Meeting Room Booking System - Apache Configuration
+
+# Enable URL Rewriting
 RewriteEngine On
+
+# Security Headers
+Header always set X-Content-Type-Options nosniff
+Header always set X-Frame-Options DENY
+Header always set X-XSS-Protection "1; mode=block"
+Header always set Referrer-Policy "strict-origin-when-cross-origin"
+Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+
+# Force HTTPS (uncomment if using SSL)
+# RewriteCond %{HTTPS} off
+# RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Block access to sensitive files
+<FilesMatch "\.(env|json|md|log|sql)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Block access to config and includes directories
+<DirectoryMatch "(config|includes|vendor)">
+    Order allow,deny
+    Deny from all
+</DirectoryMatch>
+
+# Main routing rules
 RewriteCond %{REQUEST_FILENAME} !-f
-RewriteRule ^(.*)$ public/index.php?page=$1 [QSA,L]
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# Authentication routes
+RewriteRule ^auth/login/?$ views/auth/login.php [L]
+RewriteRule ^auth/register/?$ views/auth/register.php [L]
+RewriteRule ^auth/logout/?$ views/auth/logout.php [L]
+
+# User routes
+RewriteRule ^user/dashboard/?$ views/user/dashboard.php [L]
+RewriteRule ^user/book_room/?$ views/user/book_room.php [L]
+RewriteRule ^user/my_bookings/?$ views/user/my_bookings.php [L]
+
+# Admin routes
+RewriteRule ^admin/dashboard/?$ views/admin/dashboard.php [L]
+RewriteRule ^admin/rooms/?$ views/admin/rooms.php [L]
+RewriteRule ^admin/bookings/?$ views/admin/bookings.php [L]
+RewriteRule ^admin/users/?$ views/admin/users.php [L]
+RewriteRule ^admin/reports/?$ views/admin/reports.php [L]
+
+# API routes
+RewriteRule ^api/(.+)$ api/$1 [L]
+
+# Static files
+RewriteRule ^css/(.+)$ public/css/$1 [L]
+RewriteRule ^js/(.+)$ public/js/$1 [L]
+RewriteRule ^images/(.+)$ public/images/$1 [L]
+
+# Default redirect to login
+RewriteRule ^/?$ auth/login [R=302,L]
+
+# Custom Error Pages
+ErrorDocument 404 /error/404.php
+ErrorDocument 403 /error/403.php
+ErrorDocument 500 /error/500.php
+
+# Cache Control for Static Files
+<filesMatch "\.(css|js|png|jpg|jpeg|gif|ico|svg)$">
+    ExpiresActive on
+    ExpiresDefault "access plus 1 month"
+    Header set Cache-Control "public, immutable"
+</filesMatch>
+
+# Gzip Compression
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/plain
+    AddOutputFilterByType DEFLATE text/html
+    AddOutputFilterByType DEFLATE text/xml
+    AddOutputFilterByType DEFLATE text/css
+    AddOutputFilterByType DEFLATE application/xml
+    AddOutputFilterByType DEFLATE application/xhtml+xml
+    AddOutputFilterByType DEFLATE application/rss+xml
+    AddOutputFilterByType DEFLATE application/javascript
+    AddOutputFilterByType DEFLATE application/x-javascript
+</IfModule>
+
+# Prevent directory browsing
+Options -Indexes
+
+# PHP Settings
+php_value upload_max_filesize 10M
+php_value post_max_size 10M
+php_value max_execution_time 300
+php_value memory_limit 256M
